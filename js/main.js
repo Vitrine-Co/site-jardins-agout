@@ -127,7 +127,7 @@
     cap.innerHTML = "";
     cap.append(title);
     const small = document.createElement("span");
-    small.textContent = `${meta} · ${index + 1} / ${buttons.length}`;
+    small.textContent = meta;
     cap.append(small);
   };
 
@@ -163,11 +163,16 @@
   });
 })();
 
-/* SECTION 5 · Formulaire de devis (démo : rien n'est envoyé) */
+/* SECTION 5 · Formulaire de devis
+   L'envoi part vers data-endpoint (Formspree, Web3Forms…). Tant qu'il est vide,
+   rien n'est envoyé et le formulaire le dit : jamais de faux « Merci ». */
 (() => {
   const form = document.getElementById("devis-form");
   if (!form) return;
   const success = form.parentElement.querySelector(".form__success");
+  const note = form.querySelector(".form__note");
+  const submit = form.querySelector("[type=submit]");
+  const say = (text) => { note.textContent = text; note.classList.add("is-alert"); };
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   const phoneRe = /^(?:(?:\+|00)33\s?|0)[1-9](?:[\s.-]?\d{2}){4}$/;
 
@@ -206,12 +211,27 @@
     e.preventDefault();
     const ok = Object.keys(rules).map(check).every(Boolean);
     if (!ok) { form.querySelector('[aria-invalid="true"]')?.focus(); return; }
-    // La carte garde sa hauteur : pas de saut de mise en page
-    const card = form.parentElement;
-    card.style.minHeight = card.offsetHeight + "px";
-    form.hidden = true;
-    success.hidden = false;
-    success.focus();
+
+    const endpoint = form.dataset.endpoint;
+    if (!endpoint) {
+      say("Rien n’a été envoyé : ce formulaire n’est pas encore relié. Appelez le 05 36 49 12 40.");
+      return;
+    }
+
+    submit.disabled = true;
+    submit.setAttribute("aria-busy", "true");
+    fetch(endpoint, { method: "POST", body: new FormData(form), headers: { Accept: "application/json" } })
+      .then((r) => {
+        if (!r.ok) throw new Error(r.status);
+        // La carte garde sa hauteur : pas de saut de mise en page
+        const card = form.parentElement;
+        card.style.minHeight = card.offsetHeight + "px";
+        form.hidden = true;
+        success.hidden = false;
+        success.focus();
+      })
+      .catch(() => say("L’envoi n’a pas abouti. Réessayez dans une minute, ou appelez le 05 36 49 12 40."))
+      .finally(() => { submit.disabled = false; submit.removeAttribute("aria-busy"); });
   });
 })();
 
